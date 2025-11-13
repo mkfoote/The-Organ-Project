@@ -48,7 +48,7 @@ the Arduino or right angle connectors can be used to bring out the connections.
 #include <Mouse.h>
 #include <Wire.h>
 #include <Bounce2.h>
-#include <DueTimer.h>
+//#include <DueTimer.h>
 //#include <Scheduler.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -60,10 +60,10 @@ the Arduino or right angle connectors can be used to bring out the connections.
 //Counters (old Fortran habit)
 int i, j, k;
 
-unsigned long lastDraw, lastExp, trnspReset;
+unsigned long lastDraw, lastExp, lastScan, trnspReset;
 
 byte noteStatus;
-byte noteNumber;        // low C = 36
+//byte noteNumber;        // low C = 36
 byte noteVelocity;
 
 const byte debounceCount = 3;           //Note ON if count > 0, OFF if count = 0
@@ -106,7 +106,7 @@ byte newCharCopyright[8] = {
 
 bool stopsState[70];
 
-byte swellPos, crescPos;
+byte swellPos, crescPos = 0;
 
 volatile int transpose = 0;
 volatile byte piston = 0;
@@ -224,7 +224,6 @@ void setup() {
     pinMode(trnspUpLgt, OUTPUT);
     pinMode(trnspDnLgt, OUTPUT);
 
-    //Wire.begin();
     Keyboard.begin();
     Mouse.begin();
 
@@ -235,6 +234,9 @@ void setup() {
     panic.attach(panicBtn);
     panic.interval(6);
     panic.setPressedState(LOW);
+
+    Wire.begin();
+    Wire.setTimeout(200);
 
     lcd.init();
     lcd.backlight();
@@ -261,8 +263,8 @@ void setup() {
     MIDI.setHandleNoteOn(OnNoteOn);
     MIDI.setHandleNoteOff(OnNoteOff);
 
-    Timer3.attachInterrupt(scanKeys);
-    Timer3.start(4000); // Calls every 2.5ms 400x/sec (400Hz)
+    //Timer3.attachInterrupt(scanKeys);
+    //Timer3.start(4000); // Calls every 2.5ms 400x/sec (400Hz)
 }
 
 //Main Loops ===========================================================
@@ -271,7 +273,7 @@ void loop() {
   trnspDn.update();
   panic.update();
 
-  while(MIDI.read());
+  MIDI.read();
 
   //power on mac
   //loop until confirmation message / for certain time
@@ -281,7 +283,13 @@ void loop() {
   //while(digitalRead(pwrSwitch) == HIGH) {
   //while(1) {
     //update lcd
-  if((lastDraw - millis()) > 300) {
+
+  if((micros() - lastScan) > 6000) {
+    scanKeys();
+    lastScan = micros();
+  }
+
+  if((millis() - lastDraw) > 300) {
     drawDisplay();
     lights();
     lastDraw = millis();
@@ -296,7 +304,7 @@ void loop() {
 
   //yield();
     //manage pedal
-  if((lastExp - millis()) > 400) {
+  if((millis() - lastExp) > 400) {
     scanExpression();
     lastExp = millis();
     //yield();
@@ -339,6 +347,7 @@ void scanKeys() {
         delayMicroseconds(150);
     }
     scanSwell();
+    yield();
 }
 
 /*void loop1() {
@@ -609,20 +618,24 @@ void scanGreatAndPedal() {
 
 //MIDI ON message is sent only if note is not already ON.
 void turnONgreat(byte noteNumber) {
-    if(greatDebounceArray[noteNumber] == 0) {
-        noteOn(2, noteNumber, 127);
-        greatDebounceArray[noteNumber] = debounceCount;
-    }   
+    if(noteNumber < 100) {
+        if(greatDebounceArray[noteNumber] == 0) {
+            noteOn(2, noteNumber, 127);
+            greatDebounceArray[noteNumber] = debounceCount;
+        }   
+    }
 }
 
 //MIDI OFF message is sent only if note is not already OFF.
 void turnOFFgreat(byte noteNumber) {
-    if(greatDebounceArray[noteNumber] == 1) {
-        noteOff(2, noteNumber, 0);
-    }  
+    if(noteNumber < 100) {
+        if(greatDebounceArray[noteNumber] == 1) {
+            noteOff(2, noteNumber, 0);
+        }  
 
-    if(greatDebounceArray[noteNumber] > 0)
-	greatDebounceArray[noteNumber] -- ;
+        if(greatDebounceArray[noteNumber] > 0)
+	    greatDebounceArray[noteNumber] -- ;
+    }
 }
 
 //Scan Swell keyboard, convert to MIDI and output via port 0, channel 3.
@@ -711,19 +724,23 @@ void scanSwell () {
 
 //MIDI ON message is sent only if note is not already ON.
 void turnONswell(byte noteNumber) {
-    if(swellDebounceArray[noteNumber] == 0) {
-        noteOn(1, noteNumber, 127);
-        swellDebounceArray[noteNumber] = debounceCount;
-    }   
+    if(noteNumber < 100) {
+        if(swellDebounceArray[noteNumber] == 0) {
+            noteOn(1, noteNumber, 127);
+            swellDebounceArray[noteNumber] = debounceCount;
+        }   
+    }
 }
 
 //MIDI OFF message is sent only if note is not already OFF.
 void turnOFFswell(byte noteNumber) {
-    if(swellDebounceArray[noteNumber] == 1) {
-        noteOff(1, noteNumber, 0);
-    }  
-    if(swellDebounceArray[noteNumber] > 0)
-	swellDebounceArray[noteNumber] -- ;       
+    if(noteNumber < 100) {
+        if(swellDebounceArray[noteNumber] == 1) {
+            noteOff(1, noteNumber, 0);
+        }  
+        if(swellDebounceArray[noteNumber] > 0)
+	    swellDebounceArray[noteNumber] -- ;       
+    }
 }
 
 //Scan Pedal, convert to MIDI and output via port 0, channel 1.
@@ -782,19 +799,23 @@ void scanPedal() {
 
 //MIDI ON message is sent only if note is not already ON.
 void turnONpedal(byte noteNumber) {
-    if(pedalDebounceArray[noteNumber] == 0) {
-        noteOn(3, noteNumber, 127);
-        pedalDebounceArray[noteNumber] = debounceCount;
-    }   
+    if(noteNumber < 100) {
+        if(pedalDebounceArray[noteNumber] == 0) {
+            noteOn(3, noteNumber, 127);
+            pedalDebounceArray[noteNumber] = debounceCount;
+        }
+    }
 }
 
 //MIDI OFF message is sent only if note is not already OFF.
 void turnOFFpedal(byte noteNumber) {
-    if(pedalDebounceArray[noteNumber] == 1) {
-        noteOff(3, noteNumber, 0);
-    }  
-    if(pedalDebounceArray[noteNumber] > 0)
-	pedalDebounceArray[noteNumber] -- ;
+    if(noteNumber < 100) {
+        if(pedalDebounceArray[noteNumber] == 1) {
+            noteOff(3, noteNumber, 0);
+        }
+        if(pedalDebounceArray[noteNumber] > 0)
+	    pedalDebounceArray[noteNumber] -- ;
+    }
 }
 
 void scanPistons() {  
@@ -863,20 +884,24 @@ void scanTranspose() {
 
 //MIDI ON message is sent only if note is not already ON.
 void turnONpiston(byte noteNumber) {
-    if(pistonDebounceArray[noteNumber] == 0) {
-        noteOn(5, noteNumber, 127);
-        pistonDebounceArray[noteNumber] = debounceCount;
-    }   
+    if(noteNumber < 100) {
+        if(pistonDebounceArray[noteNumber] == 0) {
+            noteOn(5, noteNumber, 127);
+            pistonDebounceArray[noteNumber] = debounceCount;
+        }   
+    }
 }
 
 //MIDI OFF message is sent only if note is not already OFF.
 void turnOFFpiston(byte noteNumber) {
-    if(pistonDebounceArray[noteNumber] == 1) {
-        noteOff(5, noteNumber, 0);
-    }  
+    if(noteNumber < 100) {
+        if(pistonDebounceArray[noteNumber] == 1) {
+            noteOff(5, noteNumber, 0);
+        }  
 
-    if(pistonDebounceArray[noteNumber] > 0)
-	pistonDebounceArray[noteNumber] -- ;
+        if(pistonDebounceArray[noteNumber] > 0)
+            pistonDebounceArray[noteNumber] -- ;
+    }
 }
 
 void scanExpression() {
@@ -908,6 +933,7 @@ void noteOn(byte channel, byte pitch, byte velocity) {
   //MidiUSB.sendMIDI(noteOn);
   delayMicroseconds(30);
   MIDI.sendNoteOn(pitch, velocity, channel);
+  yield();
 }
 
 void noteOff(byte channel, byte pitch, byte velocity) {
@@ -915,6 +941,7 @@ void noteOff(byte channel, byte pitch, byte velocity) {
   //MidiUSB.sendMIDI(noteOff);
   delayMicroseconds(30);
   MIDI.sendNoteOff(pitch, velocity, channel);
+  yield();
 }
 
 void controlChange(byte channel, byte control, byte value) {
@@ -929,17 +956,11 @@ void OnMidiSysEx(byte* data, unsigned length) {
   //if(!loaded)
     //loaded = 1;
 
-  char value[2];
+  char buf[4] = {0};
 
   if(data[3] == 0x01) {	//Message we're looking for is hex 0x01
-    memcpy(&value, &data[4], 2);
-    //value[0] = data[4];
-    //value[1] = data[5];
-    //value[2] = data[6];
-
-    String myString = String(value);
-
-    transpose = myString.toInt();
+    memcpy(&buf, &data[4], 3);
+    transpose = atoi(buf);
   }
 }
 
@@ -1009,7 +1030,7 @@ void lights() {
         digitalWrite(trnspUpLgt, HIGH);
         digitalWrite(trnspDnLgt, LOW);
     }
-    else if(transpose <= 1) {
+    else if(transpose <= -1) {
         digitalWrite(trnspUpLgt, LOW);
         digitalWrite(trnspDnLgt, HIGH);
     }
