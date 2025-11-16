@@ -284,7 +284,7 @@ void loop() {
   //while(1) {
     //update lcd
 
-  if((micros() - lastScan) > 6000) {
+  if((micros() - lastScan) > 5000) {
     scanKeys();
     lastScan = micros();
   }
@@ -931,7 +931,7 @@ void scanExpression() {
 void noteOn(byte channel, byte pitch, byte velocity) {
   //midiEventPacket_t noteOn = {0x09, 0x90 | channel, pitch, velocity};
   //MidiUSB.sendMIDI(noteOn);
-  delayMicroseconds(30);
+  delayMicroseconds(80);
   MIDI.sendNoteOn(pitch, velocity, channel);
   yield();
 }
@@ -939,7 +939,7 @@ void noteOn(byte channel, byte pitch, byte velocity) {
 void noteOff(byte channel, byte pitch, byte velocity) {
   //midiEventPacket_t noteOff = {0x08, 0x80 | channel, pitch, velocity};
   //MidiUSB.sendMIDI(noteOff);
-  delayMicroseconds(30);
+  delayMicroseconds(80);
   MIDI.sendNoteOff(pitch, velocity, channel);
   yield();
 }
