@@ -42,6 +42,8 @@ the Arduino or right angle connectors can be used to bring out the connections.
  by Matthew Foote
  */
 
+#define version "1.1.2"
+
 #include "Arduino.h"
 #include <USB-MIDI.h>
 #include <Keyboard.h>
@@ -78,9 +80,9 @@ const char lcdArray[81] = "  St. John Cantius  "
 			  "Swll:       Cres:   ";
 
 const char lcdLoad0[81] = " The Organ Project  "
-			  "     2025 GPLv3     "
+			  " 2025 Matthew Foote "
 			  "                    "
-			  "   Matthew Foote    ";
+			  "For the Glory of God";
 
 const char lcdLoad1[81] = "                    "
 			  "                    "
@@ -89,7 +91,7 @@ const char lcdLoad1[81] = "                    "
 
 const char lcdLoad2[81] = "                    "
 			  "                    "
-			  " Loading Organ File "
+			  " Loading Organ Files"
 			  "                    ";
 
 // (C)
@@ -244,7 +246,7 @@ void setup() {
     
     lcd.setCursor(0,0);
     lcd.print(lcdLoad0);
-    lcd.setCursor(4,2);
+    lcd.setCursor(0,2);
     lcd.write(byte(0));
     lcd.noCursor();
     delay(4000);
@@ -284,7 +286,7 @@ void loop() {
   //while(1) {
     //update lcd
 
-  if((micros() - lastScan) > 5000) {
+  if((micros() - lastScan) > 4000) {
     scanKeys();
     lastScan = micros();
   }
