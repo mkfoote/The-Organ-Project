@@ -1,24 +1,31 @@
 # The Organ Project
 
-This project scans a pair of keyboards as well as the pedal from an Allen MDC 20 organ and output notes via MIDI USB to an attached computer. An Arduino Due is used in this project becasue it has a large number of I/O pins, as well as native USB capabilities. The organ's original wiring is retained.
+*The Organ Project* turns a pair of keyboards and a pedalboard from an Allen MDC 20 organ into a USB MIDI controller for use with Virtual Pipe Organ software or other MIDI applications. It uses an Arduino Due for its large I/O capabilities and native USB support. The project retains the organ's original wiring, scanning the keys and pedals and converting them into MIDI signals for a connected computer.
 
-## Wiring
+## Overview
 
-#### Swell
-Referring to the pin numbers on Allen's schematic for this organ, the Swell is scanned by sequentially bringing pins 52, 63, 69, 54, 64 and 62 LOW (Arduino pins 22 - 27). 
-Pins 16, 20, 18, 22, 24, 26, 28, 30, 32, 34 and 36 (Arduino pins 36 - 46) are then scanned to determine which keys are closed. LOW = switch closed. Output on Ch. 1
+This project allows your Allen MDC 20 organ to interface with MIDI-compatible software, including Virtual Pipe Organ (VPO) systems, by scanning the organ's keyboards and pedals. It outputs MIDI data via USB, making it compatible with modern music software.
 
-#### Great
-Referring to the pin numbers on Allen's schematic for this organ, the Great is scanned by sequentially bringing pins 48, 53, 57, 55, 59 and 61 LOW (Arduino pins 28 - 33). 
-Pins 16, 20, 18, 22, 24, 26, 28, 30, 32, 34 and 36 (Arduino pins 36 - 46) are then scanned to determine which keys are closed. LOW = switch closed. Output on Ch. 2
+## Features
 
-#### Pedal
-Referring to the pin numbers on Allen's schematic for this organ, the Pedal is scanned by sequentially bringing pins 67, 65, 58, 60, 68 and 66 LOW (Arduino pins 14 - 19). 
-Pins 16, 20, 18, 22, 24, 26, and 28 (Arduino pins 47 - 53) are then scanned to determine which keys are closed. LOW = switch closed. Output on Ch. 3
+- **MIDI output over USB:** Sends note data to MIDI software or devices.
+- **Fast:** Scans the full organ in ~2ms, enabling a theoretical 500Hz scan rate.
+- **Arduino Due-based:** Uses the Due’s I/O pins and native USB support.
+- **Open Source:** Free for customization and improvement.
 
-Note! the wires running to pins 16, 20, 18, 22, 24, 26, and 28 on the pedal are to be detached from the orresponding pins on the Great and Swell.
+## Virtual Pipe Organ
 
-#### Pistons
-The Allen original piston inputs for 1, 2, 3, 4, 5 and GC are Arduino pins 0 - 5. Output on Ch. 5
+A Virtual Pipe Organ (VPO) simulates the sound of traditional pipe organs through software. This project enables your classic organ to control a VPO setup, turning it into a fully functional digital pipe organ. Using VPO software like Hauptwerk or GrandOrgue, you can play authentic pipe organ sounds directly from your physical organ.
 
-A new row of piston inputs for 1 - 10, GC, and set are matrixed. Scanned by sequentially bringing arduino pins A5 - A7 (59 - 61) LOW. Arduino pins A8 - A11 (62 - 65) are then scanned to determine which buttons are pressed.
+## License
+
+This project is licensed under the GNU General Public License - see the LICENSE file for details.
+
+## Future Goals
+
+The project is continuously evolving. Future goals include:
+- [ ] Support for more types of keyboard matrixes.
+- [ ] Expanding to support additional organ models.
+- [ ] Enhanced customization: Allowing more flexible configuration of MIDI mappings and organ features.
+- [ ] Additional MIDI controls: Implementing support for stops, pistons, and expression pedals.
+- [ ] Better documentation: Clearer guides and diagrams for easier setup and adaptation.

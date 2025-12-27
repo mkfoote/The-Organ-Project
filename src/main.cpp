@@ -52,6 +52,7 @@ the Arduino or right angle connectors can be used to bring out the connections.
 #include <Bounce2.h>
 //#include <DueTimer.h>
 //#include <Scheduler.h>
+#include "Organ.h"
 #include <LiquidCrystal_I2C.h>
 
 // Declarations==========================================
@@ -68,10 +69,7 @@ byte noteStatus;
 //byte noteNumber;        // low C = 36
 byte noteVelocity;
 
-const byte debounceCount = 3;           //Note ON if count > 0, OFF if count = 0
-byte greatDebounceArray [100];          //holds debounce count for each Great switch
-byte swellDebounceArray [100];          //holds debounce count for each Swell switch
-byte pedalDebounceArray [100];         //holds debounce count for each Piston switch
+byte debounceCount = 3;           //Note ON if count > 0, OFF if count = 0
 byte pistonDebounceArray [100];         //holds debounce count for each Piston switch
 
 const char lcdArray[81] = "  St. John Cantius  "
@@ -115,15 +113,9 @@ volatile byte piston = 0;
 volatile byte noPedal = 0;
 volatile byte loaded = 0;
 
-LiquidCrystal_I2C lcd(0x27,  20, 4);
-
-Bounce trnspUp = Bounce();
-Bounce trnspDn = Bounce();
-Bounce2::Button panic = Bounce2::Button();
-
-USBMIDI_CREATE_DEFAULT_INSTANCE();
-
 //Pin definitions
+//+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
 const byte pedSwitch  = 35;	//switch for changing pedal function LOW = swell HIGH = cresc
 const byte pwrSwitch  = 55;	//power switch LOW = off HIGH = on
 const byte trnspUpBtn = 6;	//Transpose pins. keep track 'cause we'll do some transpose features in Arduino
@@ -133,20 +125,18 @@ const byte trnspDnLgt = 9;
 const byte panicBtn   = 13;
 const byte initOvride = A0;
 
+byte swellOut[] = {22, 23, 24, 25, 26, 27};
+byte greatOut[] = {28, 29, 30, 31, 32, 33};
+byte pedalOut[] = {14, 15, 16, 17, 18, 19};
+byte gsIn[]     = {36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46};
+byte pedalIn[]  = {47, 48, 49, 50, 51, 52, 53};
+
+
 //Function declarations
+//+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
 //void loop1();
 void initializeComputer();
 void scanKeys();
-void scanGreat();
-void scanGreatAndPedal();
-void turnOFFgreat(byte noteNumber);
-void turnONgreat(byte noteNumber);
-void scanSwell();
-void turnOFFswell(byte noteNumber);
-void turnONswell(byte noteNumber);
-void scanPedal();
-void turnOFFpedal(byte noteNumber);
-void turnONpedal(byte noteNumber);
 void scanPistons();
 void scanTranspose();
 void turnOFFpiston(byte noteNumber);
@@ -161,6 +151,19 @@ void OnNoteOff(byte channel, byte note, byte velocity);
 void drawDisplay();
 void lights();
 byte countDigits(int num);
+
+//Objects
+//+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+LiquidCrystal_I2C lcd(0x27,  20, 4);
+
+Bounce trnspUp = Bounce();
+Bounce trnspDn = Bounce();
+Bounce2::Button panic = Bounce2::Button();
+
+USBMIDI_CREATE_DEFAULT_INSTANCE();
+
+Organ organ(greatOut, swellOut, pedalOut, gsIn, pedalIn, noteOn, noteOff);
 
 
 //Initialize =========================================================
@@ -210,12 +213,12 @@ void setup() {
     }
         
     //Initialize debounce count arrays to zero
-    for(i= 0; i < 100; i++) {
+    /*for(i= 0; i < 100; i++) {
         greatDebounceArray[i] = 0;
         swellDebounceArray[i] = 0;
         pedalDebounceArray[i] = 0;
         pistonDebounceArray[i] = 0; 
-    }
+    }*/
 
     //pinMode(pedSwitch, INPUT_PULLUP);
     //pinMode(pwrSwitch, INPUT_PULLUP);
@@ -225,6 +228,8 @@ void setup() {
     pinMode(initOvride, INPUT_PULLUP);
     pinMode(trnspUpLgt, OUTPUT);
     pinMode(trnspDnLgt, OUTPUT);
+
+    organ.begin();
 
     Keyboard.begin();
     Mouse.begin();
@@ -342,13 +347,14 @@ void loop() {
 
 void scanKeys() {
     if(!noPedal) {
-        scanGreatAndPedal();
+        organ.scanPedal();
+        organ.scanGreat();
     }
     else {
-        scanGreat();
+        organ.scanGreat();
         delayMicroseconds(150);
     }
-    scanSwell();
+    organ.scanSwell();
     yield();
 }
 
@@ -405,420 +411,6 @@ void initializeComputer() {
         
 
 //*******************************************************************************************
-
-//Scan Great keyboard, convert to MIDI and output via port 0, channel 2.
-void scanGreat() {
-     digitalWrite (28, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (37);} else {turnOFFgreat (37);}
-     if  (digitalRead(38) == LOW) {turnONgreat (43);} else {turnOFFgreat (43);}
-     if  (digitalRead(39) == LOW) {turnONgreat (49);} else {turnOFFgreat (49);}
-     if  (digitalRead(40) == LOW) {turnONgreat (55);} else {turnOFFgreat (55);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (61);} else {turnOFFgreat (61);}
-     if  (digitalRead(42) == LOW) {turnONgreat (67);} else {turnOFFgreat (67);}
-     if  (digitalRead(43) == LOW) {turnONgreat (73);} else {turnOFFgreat (73);}
-     if  (digitalRead(44) == LOW) {turnONgreat (79);} else {turnOFFgreat (79);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (85);} else {turnOFFgreat (85);}
-     if  (digitalRead(46) == LOW) {turnONgreat (91);} else {turnOFFgreat (91);} 
-     digitalWrite (28, HIGH); 
-     digitalWrite (29, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (38);} else {turnOFFgreat (38);}
-     if  (digitalRead(38) == LOW) {turnONgreat (44);} else {turnOFFgreat (44);}
-     if  (digitalRead(39) == LOW) {turnONgreat (50);} else {turnOFFgreat (50);}
-     if  (digitalRead(40) == LOW) {turnONgreat (56);} else {turnOFFgreat (56);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (62);} else {turnOFFgreat (62);}
-     if  (digitalRead(42) == LOW) {turnONgreat (68);} else {turnOFFgreat (68);}
-     if  (digitalRead(43) == LOW) {turnONgreat (74);} else {turnOFFgreat (74);}
-     if  (digitalRead(44) == LOW) {turnONgreat (80);} else {turnOFFgreat (80);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (86);} else {turnOFFgreat (86);}
-     if  (digitalRead(46) == LOW) {turnONgreat (92);} else {turnOFFgreat (92);} 
-     digitalWrite (29, HIGH); 
-     digitalWrite (30, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (39);} else {turnOFFgreat (39);}
-     if  (digitalRead(38) == LOW) {turnONgreat (45);} else {turnOFFgreat (45);}
-     if  (digitalRead(39) == LOW) {turnONgreat (51);} else {turnOFFgreat (51);}
-     if  (digitalRead(40) == LOW) {turnONgreat (57);} else {turnOFFgreat (57);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (63);} else {turnOFFgreat (63);}
-     if  (digitalRead(42) == LOW) {turnONgreat (69);} else {turnOFFgreat (69);}
-     if  (digitalRead(43) == LOW) {turnONgreat (75);} else {turnOFFgreat (75);}
-     if  (digitalRead(44) == LOW) {turnONgreat (81);} else {turnOFFgreat (81);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (87);} else {turnOFFgreat (87);}
-     if  (digitalRead(46) == LOW) {turnONgreat (93);} else {turnOFFgreat (93);} 
-     digitalWrite (30, HIGH); 
-     digitalWrite (31, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (40);} else {turnOFFgreat (40);}
-     if  (digitalRead(38) == LOW) {turnONgreat (46);} else {turnOFFgreat (46);}
-     if  (digitalRead(39) == LOW) {turnONgreat (52);} else {turnOFFgreat (52);}
-     if  (digitalRead(40) == LOW) {turnONgreat (58);} else {turnOFFgreat (58);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (64);} else {turnOFFgreat (64);}
-     if  (digitalRead(42) == LOW) {turnONgreat (70);} else {turnOFFgreat (70);}
-     if  (digitalRead(43) == LOW) {turnONgreat (76);} else {turnOFFgreat (76);}
-     if  (digitalRead(44) == LOW) {turnONgreat (82);} else {turnOFFgreat (82);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (88);} else {turnOFFgreat (88);}
-     if  (digitalRead(46) == LOW) {turnONgreat (94);} else {turnOFFgreat (94);} 
-     digitalWrite (31, HIGH); 
-     digitalWrite (32, LOW);  
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (41);} else {turnOFFgreat (41);}
-     if  (digitalRead(38) == LOW) {turnONgreat (47);} else {turnOFFgreat (47);}
-     if  (digitalRead(39) == LOW) {turnONgreat (53);} else {turnOFFgreat (53);}
-     if  (digitalRead(40) == LOW) {turnONgreat (59);} else {turnOFFgreat (59);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (65);} else {turnOFFgreat (65);}
-     if  (digitalRead(42) == LOW) {turnONgreat (71);} else {turnOFFgreat (71);}
-     if  (digitalRead(43) == LOW) {turnONgreat (77);} else {turnOFFgreat (77);}
-     if  (digitalRead(44) == LOW) {turnONgreat (83);} else {turnOFFgreat (83);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (89);} else {turnOFFgreat (89);}
-     if  (digitalRead(46) == LOW) {turnONgreat (95);} else {turnOFFgreat (95);} 
-     digitalWrite (32, HIGH); 
-     digitalWrite (33, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(36) == LOW) {turnONgreat (36);} else {turnOFFgreat (36);}   //bottom C
-     if  (digitalRead(37) == LOW) {turnONgreat (42);} else {turnOFFgreat (42);}
-     if  (digitalRead(38) == LOW) {turnONgreat (48);} else {turnOFFgreat (48);}
-     if  (digitalRead(39) == LOW) {turnONgreat (54);} else {turnOFFgreat (54);}
-     if  (digitalRead(40) == LOW) {turnONgreat (60);} else {turnOFFgreat (60);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (66);} else {turnOFFgreat (66);}
-     if  (digitalRead(42) == LOW) {turnONgreat (72);} else {turnOFFgreat (72);}
-     if  (digitalRead(43) == LOW) {turnONgreat (78);} else {turnOFFgreat (78);}
-     if  (digitalRead(44) == LOW) {turnONgreat (84);} else {turnOFFgreat (84);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (90);} else {turnOFFgreat (90);}
-     if  (digitalRead(46) == LOW) {turnONgreat (96);} else {turnOFFgreat (96);} 
-     digitalWrite (33, HIGH);   
-     delayMicroseconds(17);
-}
-
-//Scan Great keyboard nad pedal, convert to MIDI
-void scanGreatAndPedal() {
-     digitalWrite (28, LOW);    
-     digitalWrite (14, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (37);} else {turnOFFgreat (37);}
-     if  (digitalRead(38) == LOW) {turnONgreat (43);} else {turnOFFgreat (43);}
-     if  (digitalRead(39) == LOW) {turnONgreat (49);} else {turnOFFgreat (49);}
-     if  (digitalRead(40) == LOW) {turnONgreat (55);} else {turnOFFgreat (55);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (61);} else {turnOFFgreat (61);}
-     if  (digitalRead(42) == LOW) {turnONgreat (67);} else {turnOFFgreat (67);}
-     if  (digitalRead(43) == LOW) {turnONgreat (73);} else {turnOFFgreat (73);}
-     if  (digitalRead(44) == LOW) {turnONgreat (79);} else {turnOFFgreat (79);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (85);} else {turnOFFgreat (85);}
-     if  (digitalRead(46) == LOW) {turnONgreat (91);} else {turnOFFgreat (91);} 
-     if  (digitalRead(48) == LOW) {turnONpedal (37);} else {turnOFFpedal (37);}
-     if  (digitalRead(49) == LOW) {turnONpedal (43);} else {turnOFFpedal (43);}
-     if  (digitalRead(50) == LOW) {turnONpedal (49);} else {turnOFFpedal (49);}
-     if  (digitalRead(51) == LOW) {turnONpedal (55);} else {turnOFFpedal (55);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (61);} else {turnOFFpedal (61);}
-     if  (digitalRead(53) == LOW) {turnONpedal (67);} else {turnOFFpedal (67);}
-     digitalWrite (28, HIGH); 
-     digitalWrite (29, LOW);    
-     digitalWrite (14, HIGH); 
-     digitalWrite (15, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (38);} else {turnOFFgreat (38);}
-     if  (digitalRead(38) == LOW) {turnONgreat (44);} else {turnOFFgreat (44);}
-     if  (digitalRead(39) == LOW) {turnONgreat (50);} else {turnOFFgreat (50);}
-     if  (digitalRead(40) == LOW) {turnONgreat (56);} else {turnOFFgreat (56);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (62);} else {turnOFFgreat (62);}
-     if  (digitalRead(42) == LOW) {turnONgreat (68);} else {turnOFFgreat (68);}
-     if  (digitalRead(43) == LOW) {turnONgreat (74);} else {turnOFFgreat (74);}
-     if  (digitalRead(44) == LOW) {turnONgreat (80);} else {turnOFFgreat (80);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (86);} else {turnOFFgreat (86);}
-     if  (digitalRead(46) == LOW) {turnONgreat (92);} else {turnOFFgreat (92);} 
-     if  (digitalRead(48) == LOW) {turnONpedal (38);} else {turnOFFpedal (38);}
-     if  (digitalRead(49) == LOW) {turnONpedal (44);} else {turnOFFpedal (44);}
-     if  (digitalRead(50) == LOW) {turnONpedal (50);} else {turnOFFpedal (50);}
-     if  (digitalRead(51) == LOW) {turnONpedal (56);} else {turnOFFpedal (56);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (62);} else {turnOFFpedal (62);}
-     digitalWrite (29, HIGH); 
-     digitalWrite (30, LOW);    
-     digitalWrite (15, HIGH); 
-     digitalWrite (16, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (39);} else {turnOFFgreat (39);}
-     if  (digitalRead(38) == LOW) {turnONgreat (45);} else {turnOFFgreat (45);}
-     if  (digitalRead(39) == LOW) {turnONgreat (51);} else {turnOFFgreat (51);}
-     if  (digitalRead(40) == LOW) {turnONgreat (57);} else {turnOFFgreat (57);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (63);} else {turnOFFgreat (63);}
-     if  (digitalRead(42) == LOW) {turnONgreat (69);} else {turnOFFgreat (69);}
-     if  (digitalRead(43) == LOW) {turnONgreat (75);} else {turnOFFgreat (75);}
-     if  (digitalRead(44) == LOW) {turnONgreat (81);} else {turnOFFgreat (81);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (87);} else {turnOFFgreat (87);}
-     if  (digitalRead(46) == LOW) {turnONgreat (93);} else {turnOFFgreat (93);} 
-     if  (digitalRead(48) == LOW) {turnONpedal (39);} else {turnOFFpedal (39);}
-     if  (digitalRead(49) == LOW) {turnONpedal (45);} else {turnOFFpedal (45);}
-     if  (digitalRead(50) == LOW) {turnONpedal (51);} else {turnOFFpedal (51);}
-     if  (digitalRead(51) == LOW) {turnONpedal (57);} else {turnOFFpedal (57);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (63);} else {turnOFFpedal (63);}
-     digitalWrite (30, HIGH); 
-     digitalWrite (31, LOW);    
-     digitalWrite (16, HIGH); 
-     digitalWrite (17, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (40);} else {turnOFFgreat (40);}
-     if  (digitalRead(38) == LOW) {turnONgreat (46);} else {turnOFFgreat (46);}
-     if  (digitalRead(39) == LOW) {turnONgreat (52);} else {turnOFFgreat (52);}
-     if  (digitalRead(40) == LOW) {turnONgreat (58);} else {turnOFFgreat (58);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (64);} else {turnOFFgreat (64);}
-     if  (digitalRead(42) == LOW) {turnONgreat (70);} else {turnOFFgreat (70);}
-     if  (digitalRead(43) == LOW) {turnONgreat (76);} else {turnOFFgreat (76);}
-     if  (digitalRead(44) == LOW) {turnONgreat (82);} else {turnOFFgreat (82);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (88);} else {turnOFFgreat (88);}
-     if  (digitalRead(46) == LOW) {turnONgreat (94);} else {turnOFFgreat (94);} 
-     if  (digitalRead(48) == LOW) {turnONpedal (40);} else {turnOFFpedal (40);}
-     if  (digitalRead(49) == LOW) {turnONpedal (46);} else {turnOFFpedal (46);}
-     if  (digitalRead(50) == LOW) {turnONpedal (52);} else {turnOFFpedal (52);}
-     if  (digitalRead(51) == LOW) {turnONpedal (58);} else {turnOFFpedal (58);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (64);} else {turnOFFpedal (64);}
-     digitalWrite (31, HIGH); 
-     digitalWrite (32, LOW);  
-     digitalWrite (17, HIGH); 
-     digitalWrite (18, LOW);  
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONgreat (41);} else {turnOFFgreat (41);}
-     if  (digitalRead(38) == LOW) {turnONgreat (47);} else {turnOFFgreat (47);}
-     if  (digitalRead(39) == LOW) {turnONgreat (53);} else {turnOFFgreat (53);}
-     if  (digitalRead(40) == LOW) {turnONgreat (59);} else {turnOFFgreat (59);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (65);} else {turnOFFgreat (65);}
-     if  (digitalRead(42) == LOW) {turnONgreat (71);} else {turnOFFgreat (71);}
-     if  (digitalRead(43) == LOW) {turnONgreat (77);} else {turnOFFgreat (77);}
-     if  (digitalRead(44) == LOW) {turnONgreat (83);} else {turnOFFgreat (83);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (89);} else {turnOFFgreat (89);}
-     if  (digitalRead(46) == LOW) {turnONgreat (95);} else {turnOFFgreat (95);} 
-     if  (digitalRead(48) == LOW) {turnONpedal (41);} else {turnOFFpedal (41);}
-     if  (digitalRead(49) == LOW) {turnONpedal (47);} else {turnOFFpedal (47);}
-     if  (digitalRead(50) == LOW) {turnONpedal (53);} else {turnOFFpedal (53);}
-     if  (digitalRead(51) == LOW) {turnONpedal (59);} else {turnOFFpedal (59);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (65);} else {turnOFFpedal (65);}
-     digitalWrite (32, HIGH); 
-     digitalWrite (33, LOW);    
-     digitalWrite (18, HIGH); 
-     digitalWrite (19, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(36) == LOW) {turnONgreat (36);} else {turnOFFgreat (36);}   //bottom C
-     if  (digitalRead(37) == LOW) {turnONgreat (42);} else {turnOFFgreat (42);}
-     if  (digitalRead(38) == LOW) {turnONgreat (48);} else {turnOFFgreat (48);}
-     if  (digitalRead(39) == LOW) {turnONgreat (54);} else {turnOFFgreat (54);}
-     if  (digitalRead(40) == LOW) {turnONgreat (60);} else {turnOFFgreat (60);}     
-     if  (digitalRead(41) == LOW) {turnONgreat (66);} else {turnOFFgreat (66);}
-     if  (digitalRead(42) == LOW) {turnONgreat (72);} else {turnOFFgreat (72);}
-     if  (digitalRead(43) == LOW) {turnONgreat (78);} else {turnOFFgreat (78);}
-     if  (digitalRead(44) == LOW) {turnONgreat (84);} else {turnOFFgreat (84);} 
-     if  (digitalRead(45) == LOW) {turnONgreat (90);} else {turnOFFgreat (90);}
-     if  (digitalRead(46) == LOW) {turnONgreat (96);} else {turnOFFgreat (96);} 
-     if  (digitalRead(47) == LOW) {turnONpedal (36);} else {turnOFFpedal (36);}   //bottom C
-     if  (digitalRead(48) == LOW) {turnONpedal (42);} else {turnOFFpedal (42);}
-     if  (digitalRead(49) == LOW) {turnONpedal (48);} else {turnOFFpedal (48);}
-     if  (digitalRead(50) == LOW) {turnONpedal (54);} else {turnOFFpedal (54);}
-     if  (digitalRead(51) == LOW) {turnONpedal (60);} else {turnOFFpedal (60);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (66);} else {turnOFFpedal (66);}
-     digitalWrite (33, HIGH);   
-     digitalWrite (19, HIGH);   
-     delayMicroseconds(17);
-}
-
-//MIDI ON message is sent only if note is not already ON.
-void turnONgreat(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(greatDebounceArray[noteNumber] == 0) {
-            noteOn(2, noteNumber, 127);
-            greatDebounceArray[noteNumber] = debounceCount;
-        }   
-    }
-}
-
-//MIDI OFF message is sent only if note is not already OFF.
-void turnOFFgreat(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(greatDebounceArray[noteNumber] == 1) {
-            noteOff(2, noteNumber, 0);
-        }  
-
-        if(greatDebounceArray[noteNumber] > 0)
-	    greatDebounceArray[noteNumber] -- ;
-    }
-}
-
-//Scan Swell keyboard, convert to MIDI and output via port 0, channel 3.
-void scanSwell () {
-     digitalWrite (22, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONswell (37);} else {turnOFFswell (37);}
-     if  (digitalRead(38) == LOW) {turnONswell (43);} else {turnOFFswell (43);}
-     if  (digitalRead(39) == LOW) {turnONswell (49);} else {turnOFFswell (49);}
-     if  (digitalRead(40) == LOW) {turnONswell (55);} else {turnOFFswell (55);}     
-     if  (digitalRead(41) == LOW) {turnONswell (61);} else {turnOFFswell (61);}
-     if  (digitalRead(42) == LOW) {turnONswell (67);} else {turnOFFswell (67);}
-     if  (digitalRead(43) == LOW) {turnONswell (73);} else {turnOFFswell (73);}
-     if  (digitalRead(44) == LOW) {turnONswell (79);} else {turnOFFswell (79);} 
-     if  (digitalRead(45) == LOW) {turnONswell (85);} else {turnOFFswell (85);}
-     if  (digitalRead(46) == LOW) {turnONswell (91);} else {turnOFFswell (91);} 
-     digitalWrite (22, HIGH); 
-     digitalWrite (23, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONswell (38);} else {turnOFFswell (38);}
-     if  (digitalRead(38) == LOW) {turnONswell (44);} else {turnOFFswell (44);}
-     if  (digitalRead(39) == LOW) {turnONswell (50);} else {turnOFFswell (50);}
-     if  (digitalRead(40) == LOW) {turnONswell (56);} else {turnOFFswell (56);}     
-     if  (digitalRead(41) == LOW) {turnONswell (62);} else {turnOFFswell (62);}
-     if  (digitalRead(42) == LOW) {turnONswell (68);} else {turnOFFswell (68);}
-     if  (digitalRead(43) == LOW) {turnONswell (74);} else {turnOFFswell (74);}
-     if  (digitalRead(44) == LOW) {turnONswell (80);} else {turnOFFswell (80);} 
-     if  (digitalRead(45) == LOW) {turnONswell (86);} else {turnOFFswell (86);}
-     if  (digitalRead(46) == LOW) {turnONswell (92);} else {turnOFFswell (92);} 
-     digitalWrite (23, HIGH); 
-     digitalWrite (24, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONswell (39);} else {turnOFFswell (39);}
-     if  (digitalRead(38) == LOW) {turnONswell (45);} else {turnOFFswell (45);}
-     if  (digitalRead(39) == LOW) {turnONswell (51);} else {turnOFFswell (51);}
-     if  (digitalRead(40) == LOW) {turnONswell (57);} else {turnOFFswell (57);}     
-     if  (digitalRead(41) == LOW) {turnONswell (63);} else {turnOFFswell (63);}
-     if  (digitalRead(42) == LOW) {turnONswell (69);} else {turnOFFswell (69);}
-     if  (digitalRead(43) == LOW) {turnONswell (75);} else {turnOFFswell (75);}
-     if  (digitalRead(44) == LOW) {turnONswell (81);} else {turnOFFswell (81);} 
-     if  (digitalRead(45) == LOW) {turnONswell (87);} else {turnOFFswell (87);}
-     if  (digitalRead(46) == LOW) {turnONswell (93);} else {turnOFFswell (93);} 
-     digitalWrite (24, HIGH); 
-     digitalWrite (25, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONswell (40);} else {turnOFFswell (40);}
-     if  (digitalRead(38) == LOW) {turnONswell (46);} else {turnOFFswell (46);}
-     if  (digitalRead(39) == LOW) {turnONswell (52);} else {turnOFFswell (52);}
-     if  (digitalRead(40) == LOW) {turnONswell (58);} else {turnOFFswell (58);}     
-     if  (digitalRead(41) == LOW) {turnONswell (64);} else {turnOFFswell (64);}
-     if  (digitalRead(42) == LOW) {turnONswell (70);} else {turnOFFswell (70);}
-     if  (digitalRead(43) == LOW) {turnONswell (76);} else {turnOFFswell (76);}
-     if  (digitalRead(44) == LOW) {turnONswell (82);} else {turnOFFswell (82);} 
-     if  (digitalRead(45) == LOW) {turnONswell (88);} else {turnOFFswell (88);}
-     if  (digitalRead(46) == LOW) {turnONswell (94);} else {turnOFFswell (94);} 
-     digitalWrite (25, HIGH); 
-     digitalWrite (26, LOW);  
-     delayMicroseconds(17);
-     if  (digitalRead(37) == LOW) {turnONswell (41);} else {turnOFFswell (41);}
-     if  (digitalRead(38) == LOW) {turnONswell (47);} else {turnOFFswell (47);}
-     if  (digitalRead(39) == LOW) {turnONswell (53);} else {turnOFFswell (53);}
-     if  (digitalRead(40) == LOW) {turnONswell (59);} else {turnOFFswell (59);}     
-     if  (digitalRead(41) == LOW) {turnONswell (65);} else {turnOFFswell (65);}
-     if  (digitalRead(42) == LOW) {turnONswell (71);} else {turnOFFswell (71);}
-     if  (digitalRead(43) == LOW) {turnONswell (77);} else {turnOFFswell (77);}
-     if  (digitalRead(44) == LOW) {turnONswell (83);} else {turnOFFswell (83);} 
-     if  (digitalRead(45) == LOW) {turnONswell (89);} else {turnOFFswell (89);}
-     if  (digitalRead(46) == LOW) {turnONswell (95);} else {turnOFFswell (95);} 
-     digitalWrite (26, HIGH); 
-     digitalWrite (27, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(36) == LOW) {turnONswell (36);} else {turnOFFswell (36);}   //bottom C
-     if  (digitalRead(37) == LOW) {turnONswell (42);} else {turnOFFswell (42);}
-     if  (digitalRead(38) == LOW) {turnONswell (48);} else {turnOFFswell (48);}
-     if  (digitalRead(39) == LOW) {turnONswell (54);} else {turnOFFswell (54);}
-     if  (digitalRead(40) == LOW) {turnONswell (60);} else {turnOFFswell (60);}     
-     if  (digitalRead(41) == LOW) {turnONswell (66);} else {turnOFFswell (66);}
-     if  (digitalRead(42) == LOW) {turnONswell (72);} else {turnOFFswell (72);}
-     if  (digitalRead(43) == LOW) {turnONswell (78);} else {turnOFFswell (78);}
-     if  (digitalRead(44) == LOW) {turnONswell (84);} else {turnOFFswell (84);} 
-     if  (digitalRead(45) == LOW) {turnONswell (90);} else {turnOFFswell (90);}
-     if  (digitalRead(46) == LOW) {turnONswell (96);} else {turnOFFswell (96);} 
-     digitalWrite (27, HIGH);   
-     delayMicroseconds(17);
-}
-
-//MIDI ON message is sent only if note is not already ON.
-void turnONswell(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(swellDebounceArray[noteNumber] == 0) {
-            noteOn(1, noteNumber, 127);
-            swellDebounceArray[noteNumber] = debounceCount;
-        }   
-    }
-}
-
-//MIDI OFF message is sent only if note is not already OFF.
-void turnOFFswell(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(swellDebounceArray[noteNumber] == 1) {
-            noteOff(1, noteNumber, 0);
-        }  
-        if(swellDebounceArray[noteNumber] > 0)
-	    swellDebounceArray[noteNumber] -- ;       
-    }
-}
-
-//Scan Pedal, convert to MIDI and output via port 0, channel 1.
-void scanPedal() {
-     digitalWrite (14, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(48) == LOW) {turnONpedal (37);} else {turnOFFpedal (37);}
-     if  (digitalRead(49) == LOW) {turnONpedal (43);} else {turnOFFpedal (43);}
-     if  (digitalRead(50) == LOW) {turnONpedal (49);} else {turnOFFpedal (49);}
-     if  (digitalRead(51) == LOW) {turnONpedal (55);} else {turnOFFpedal (55);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (61);} else {turnOFFpedal (61);}
-     if  (digitalRead(53) == LOW) {turnONpedal (67);} else {turnOFFpedal (67);}
-     digitalWrite (14, HIGH); 
-     digitalWrite (15, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(48) == LOW) {turnONpedal (38);} else {turnOFFpedal (38);}
-     if  (digitalRead(49) == LOW) {turnONpedal (44);} else {turnOFFpedal (44);}
-     if  (digitalRead(50) == LOW) {turnONpedal (50);} else {turnOFFpedal (50);}
-     if  (digitalRead(51) == LOW) {turnONpedal (56);} else {turnOFFpedal (56);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (62);} else {turnOFFpedal (62);}
-     digitalWrite (15, HIGH); 
-     digitalWrite (16, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(48) == LOW) {turnONpedal (39);} else {turnOFFpedal (39);}
-     if  (digitalRead(49) == LOW) {turnONpedal (45);} else {turnOFFpedal (45);}
-     if  (digitalRead(50) == LOW) {turnONpedal (51);} else {turnOFFpedal (51);}
-     if  (digitalRead(51) == LOW) {turnONpedal (57);} else {turnOFFpedal (57);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (63);} else {turnOFFpedal (63);}
-     digitalWrite (16, HIGH); 
-     digitalWrite (17, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(48) == LOW) {turnONpedal (40);} else {turnOFFpedal (40);}
-     if  (digitalRead(49) == LOW) {turnONpedal (46);} else {turnOFFpedal (46);}
-     if  (digitalRead(50) == LOW) {turnONpedal (52);} else {turnOFFpedal (52);}
-     if  (digitalRead(51) == LOW) {turnONpedal (58);} else {turnOFFpedal (58);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (64);} else {turnOFFpedal (64);}
-     digitalWrite (17, HIGH); 
-     digitalWrite (18, LOW);  
-     delayMicroseconds(17);
-     if  (digitalRead(48) == LOW) {turnONpedal (41);} else {turnOFFpedal (41);}
-     if  (digitalRead(49) == LOW) {turnONpedal (47);} else {turnOFFpedal (47);}
-     if  (digitalRead(50) == LOW) {turnONpedal (53);} else {turnOFFpedal (53);}
-     if  (digitalRead(51) == LOW) {turnONpedal (59);} else {turnOFFpedal (59);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (65);} else {turnOFFpedal (65);}
-     digitalWrite (18, HIGH); 
-     digitalWrite (19, LOW);    
-     delayMicroseconds(17);
-     if  (digitalRead(47) == LOW) {turnONpedal (36);} else {turnOFFpedal (36);}   //bottom C
-     if  (digitalRead(48) == LOW) {turnONpedal (42);} else {turnOFFpedal (42);}
-     if  (digitalRead(49) == LOW) {turnONpedal (48);} else {turnOFFpedal (48);}
-     if  (digitalRead(50) == LOW) {turnONpedal (54);} else {turnOFFpedal (54);}
-     if  (digitalRead(51) == LOW) {turnONpedal (60);} else {turnOFFpedal (60);}     
-     if  (digitalRead(52) == LOW) {turnONpedal (66);} else {turnOFFpedal (66);}
-     digitalWrite (19, HIGH);   
-}
-
-//MIDI ON message is sent only if note is not already ON.
-void turnONpedal(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(pedalDebounceArray[noteNumber] == 0) {
-            noteOn(3, noteNumber, 127);
-            pedalDebounceArray[noteNumber] = debounceCount;
-        }
-    }
-}
-
-//MIDI OFF message is sent only if note is not already OFF.
-void turnOFFpedal(byte noteNumber) {
-    if(noteNumber < 100) {
-        if(pedalDebounceArray[noteNumber] == 1) {
-            noteOff(3, noteNumber, 0);
-        }
-        if(pedalDebounceArray[noteNumber] > 0)
-	    pedalDebounceArray[noteNumber] -- ;
-    }
-}
 
 void scanPistons() {  
     for (j = 0; j < 6; j++) {
