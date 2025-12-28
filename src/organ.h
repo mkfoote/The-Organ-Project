@@ -7,14 +7,18 @@
 #ifndef Organ_h
 #define Organ_h
 
+#define NUM_KEYBOARDS 5
+
 #include "Arduino.h"
 
 class Organ
 {
   public:
-    Organ(uint8_t *gOut, uint8_t *sOut, uint8_t *pOut, uint8_t *gsIn, uint8_t *pIn, void (*on)(byte, byte, byte), void (*off)(byte, byte, byte));
+    //Organ(uint8_t *gOut, uint8_t *sOut, uint8_t *pOut, uint8_t *gsIn, uint8_t *pIn, void (*on)(byte, byte, byte), void (*off)(byte, byte, byte));
+    Organ(void (*on)(byte, byte, byte), void (*off)(byte, byte, byte));
+    void setKeyboard(uint8_t num, uint8_t offset, uint8_t *in, uint8_t n1, uint8_t *out, uint8_t n2);
     void begin();
-    void scanOrgan();
+    //void scanOrgan();
     void scanGreat();
     void scanSwell();
     void scanPedal();
@@ -29,24 +33,20 @@ class Organ
     uint8_t _pedalOutput[15] = {};
     uint8_t _gsInput[15]     = {};
     uint8_t _pedalInput[15]  = {};
-    //int _pin;
 
-    uint8_t _greatDebounceArray [100];          //holds debounce count for each Great switch
-    uint8_t _swellDebounceArray [100];          //holds debounce count for each Swell switch
-    uint8_t _pedalDebounceArray [100];          //holds debounce count for each Piston switch
-    uint8_t _pistonDebounceArray [50];          //holds debounce count for each Piston switch
+    uint8_t _pinsIn  [NUM_KEYBOARDS][15] = {};
+    uint8_t _pinsOut [NUM_KEYBOARDS][15] = {};
 
-    void turnONgreat(uint8_t noteNumber);
-    void turnOFFgreat(uint8_t noteNumber);
+    uint8_t _inCnt  [NUM_KEYBOARDS] = {};
+    uint8_t _outCnt [NUM_KEYBOARDS] = {};
+    uint8_t _offset [NUM_KEYBOARDS] = {};
 
-    void turnONswell(uint8_t noteNumber);
-    void turnOFFswell(uint8_t noteNumber);
+    uint8_t _debounceArray [NUM_KEYBOARDS][70];          //holds debounce count for each switch
 
-    void turnONpedal(uint8_t noteNumber);
-    void turnOFFpedal(uint8_t noteNumber);
+    void kbdOn(uint8_t kbd, uint8_t noteNumber);
+    void kbdOff(uint8_t kbd, uint8_t noteNumber);
 
-    //void turnONpiston(uint8_t noteNumber);
-    //void turnOFFpiston(uint8_t noteNumber);
+    void scan(uint8_t kbd);
 
     void (*_noteOn)(byte, byte, byte);
     void (*_noteOff)(byte, byte, byte);

@@ -163,7 +163,7 @@ Bounce2::Button panic = Bounce2::Button();
 
 USBMIDI_CREATE_DEFAULT_INSTANCE();
 
-Organ organ(greatOut, swellOut, pedalOut, gsIn, pedalIn, noteOn, noteOff);
+Organ organ(noteOn, noteOff);
 
 
 //Initialize =========================================================
@@ -228,6 +228,10 @@ void setup() {
     pinMode(initOvride, INPUT_PULLUP);
     pinMode(trnspUpLgt, OUTPUT);
     pinMode(trnspDnLgt, OUTPUT);
+
+    organ.setKeyboard(0, 31, pedalOut, 6, pedalIn, 7);
+    organ.setKeyboard(1, 31, greatOut, 6, gsIn, 11);
+    organ.setKeyboard(2, 31, swellOut, 6, gsIn, 11);
 
     organ.begin();
 
